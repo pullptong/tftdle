@@ -1,45 +1,452 @@
-function App() {
+import {
+  ComponentType,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import Select, {
+  components,
+  GroupBase,
+  MultiValue,
+  OptionProps,
+} from "react-select";
+import {
+  Champion,
+  Classes,
+  Guess,
+  GuessAnswer,
+  GuessNumberAnswer,
+  IsGuessed,
+  Origins,
+  TFTSetSelectValue,
+} from "./interfaces";
+import { sample } from "lodash";
+import tftSetOptions from "./config/set";
+
+interface SelectOption {
+  value: number;
+  label: string;
+  raw: Champion;
+}
+
+const CustomOption: ComponentType<
+  OptionProps<SelectOption, false, GroupBase<SelectOption>> & {
+    isInfoOn: boolean;
+  }
+> = (props) => {
+  const { data, isInfoOn } = props;
   return (
-    <div className="flex flex-col items-center justify-center h-screen text-red-300 bg-gradient-to-br from-gray-300 via-teal-700 to-gray-800">
-      <div className="flex items-center animate-bounce">
-        <svg viewBox="0 0 64 64" className="w-32 text-indigo-700 fill-current">
-          <path d="M52.275 22.147a63.008 63.008 0 0 0-2.025-.637c.112-.462.212-.925.313-1.387 1.537-7.45.524-13.437-2.888-15.412-3.287-1.888-8.65.075-14.075 4.8-.538.462-1.063.95-1.563 1.437-.337-.325-.687-.65-1.037-.962-5.688-5.05-11.387-7.175-14.8-5.188-3.275 1.9-4.25 7.537-2.875 14.587.138.7.288 1.388.463 2.088-.8.224-1.588.474-2.325.737C4.788 24.522 0 28.172 0 31.947c0 3.9 5.1 7.812 12.037 10.187.563.187 1.125.375 1.7.537a45.04 45.04 0 0 0-.5 2.25c-1.312 6.937-.287 12.437 2.988 14.324 3.375 1.95 9.05-.05 14.575-4.887.438-.387.875-.787 1.312-1.212.55.537 1.125 1.05 1.7 1.55 5.35 4.6 10.638 6.462 13.9 4.574 3.375-1.95 4.475-7.862 3.05-15.061a52.467 52.467 0 0 0-.374-1.688c.4-.112.787-.237 1.175-.362C58.775 39.772 64 35.909 64 31.947c0-3.787-4.925-7.462-11.725-9.8zM35.362 11.536c4.65-4.05 8.988-5.638 10.963-4.5 2.112 1.212 2.925 6.112 1.6 12.55a20.19 20.19 0 0 1-.287 1.249 63.994 63.994 0 0 0-8.413-1.325 63.153 63.153 0 0 0-5.325-6.637c.488-.463.962-.9 1.462-1.337zM20.9 38.434a86.067 86.067 0 0 0 1.975 3.237 56.605 56.605 0 0 1-5.8-.937c.55-1.8 1.238-3.662 2.038-5.562a82.583 82.583 0 0 0 1.787 3.262zm-3.787-15.037c1.8-.4 3.712-.725 5.7-.975a73.891 73.891 0 0 0-1.925 3.175 73.904 73.904 0 0 0-1.776 3.25 59.594 59.594 0 0 1-2-5.45zm3.425 8.612a78.537 78.537 0 0 1 2.674-5.074 75.374 75.374 0 0 1 3.05-4.863A78.408 78.408 0 0 1 32 21.86c1.95 0 3.875.075 5.737.212a87.325 87.325 0 0 1 3.038 4.838 85.138 85.138 0 0 1 2.712 5.05 82.936 82.936 0 0 1-2.7 5.1 85.374 85.374 0 0 1-3.024 4.874c-1.863.137-3.8.2-5.763.2-1.962 0-3.863-.063-5.7-.175a76.007 76.007 0 0 1-5.762-9.95zm22.574 6.4a86.342 86.342 0 0 0 1.825-3.337c.8 1.812 1.5 3.65 2.113 5.537-1.938.437-3.9.775-5.875 1a83.722 83.722 0 0 0 1.938-3.2zm1.8-9.562c-.587-1.1-1.187-2.2-1.812-3.275a81.255 81.255 0 0 0-1.913-3.15c2.013.25 3.938.588 5.738 1a55.315 55.315 0 0 1-2.012 5.425zM32.026 14.785a54.888 54.888 0 0 1 3.7 4.475 81.997 81.997 0 0 0-7.438 0 63.146 63.146 0 0 1 3.738-4.475zm-14.5-7.662c2.1-1.225 6.763.525 11.675 4.875.313.275.625.575.95.875a63.504 63.504 0 0 0-5.362 6.637c-2.826.25-5.625.688-8.4 1.3-.163-.637-.3-1.287-.438-1.937-1.175-6.05-.4-10.612 1.575-11.75zm-3.062 32.949a31.894 31.894 0 0 1-1.55-.488c-2.663-.837-5.688-2.162-7.876-3.9a5.609 5.609 0 0 1-2.35-3.737c0-2.287 3.95-5.212 9.65-7.2.713-.25 1.438-.475 2.163-.687a66.462 66.462 0 0 0 3.063 7.95 68.322 68.322 0 0 0-3.1 8.062zM29.038 52.32a22.88 22.88 0 0 1-7.05 4.412 5.533 5.533 0 0 1-4.413.163c-1.987-1.15-2.813-5.563-1.688-11.5.138-.7.288-1.4.463-2.087 2.8.6 5.625 1.012 8.487 1.225a65.963 65.963 0 0 0 5.4 6.674c-.4.388-.8.763-1.2 1.113zm3.062-3.037a59.114 59.114 0 0 1-3.788-4.538c1.2.05 2.438.075 3.688.075 1.288 0 2.55-.025 3.8-.087a53.904 53.904 0 0 1-3.7 4.55zm16.337 3.75a5.555 5.555 0 0 1-2.062 3.912c-1.987 1.15-6.225-.35-10.8-4.275-.525-.45-1.05-.938-1.588-1.438a61.833 61.833 0 0 0 5.276-6.7 61.623 61.623 0 0 0 8.525-1.312c.125.513.237 1.025.337 1.525.612 2.7.712 5.512.313 8.287zm2.276-13.437c-.35.112-.7.225-1.063.325a63.494 63.494 0 0 0-3.188-7.975 63.177 63.177 0 0 0 3.063-7.862c.65.187 1.275.387 1.875.587 5.825 2 9.913 4.975 9.913 7.25 0 2.45-4.363 5.612-10.6 7.675zM32 37.722a5.724 5.724 0 0 0 5.725-5.725A5.724 5.724 0 0 0 32 26.272a5.724 5.724 0 0 0-5.725 5.725A5.724 5.724 0 0 0 32 37.722z" />
-        </svg>
-        <span className="pl-5 pr-2 text-6xl">+</span>
-        <svg
-          className="w-32 text-indigo-700 fill-current"
-          viewBox="0 0 64 64"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M13.5 11.1C15.3 3.9 19.8.3 27 .3c10.8 0 12.15 8.1 17.55 9.45 3.6.9 6.75-.45 9.45-4.05-1.8 7.2-6.3 10.8-13.5 10.8-10.8 0-12.15-8.1-17.55-9.45-3.6-.9-6.75.45-9.45 4.05zM0 27.3c1.8-7.2 6.3-10.8 13.5-10.8 10.8 0 12.15 8.1 17.55 9.45 3.6.9 6.75-.45 9.45-4.05-1.8 7.2-6.3 10.8-13.5 10.8-10.8 0-12.15-8.1-17.55-9.45-3.6-.9-6.75.45-9.45 4.05z"
-            transform="translate(5 16)"
-          ></path>
-        </svg>
-      </div>
-      <p className="mt-6 tracking-wide">
-        Edit <code>src/App.tsx</code> and save to reload.
-      </p>
-      <div className="flex justify-center mt-4">
-        <a
-          className="px-4 py-2 text-white bg-indigo-500 rounded hover:bg-indigo-600"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-        <a
-          className="px-4 py-2 ml-4 text-white bg-indigo-500 rounded hover:bg-indigo-600"
-          href="https://tailwindcss.com"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn Tailwind CSS v3.x
-        </a>
-      </div>
+    <div>
+      <components.Option {...props}>
+        <div>
+          <p>
+            {data.raw.name}{" "}
+            <span className="text-xs text-sky-600">Set {data.raw.set}</span>
+          </p>
+          {isInfoOn && (
+            <div className="grid grid-cols-6 gap-1 text-xs">
+              <span>Cost {data.raw.cost}</span>
+              {data.raw.origin1 ? (
+                <span className="col-span-2 flex flex-col">
+                  <span>{data.raw.origin1}</span>
+                  <span>{data.raw.origin2}</span>
+                </span>
+              ) : undefined}
+              {data.raw.class1 ? (
+                <span className="col-span-2 flex flex-col">
+                  <span>{data.raw.class1}</span>
+                  <span>{data.raw.class2}</span>
+                </span>
+              ) : undefined}
+              {data.raw.range === 1 ? (
+                <span>Melee</span>
+              ) : (
+                <span>Range {data.raw.range}</span>
+              )}
+            </div>
+          )}
+        </div>
+      </components.Option>
     </div>
   );
-}
+};
+
+const App = () => {
+  const [selected, setSelected] = useState<number>();
+  const [guesses, setGuesses] = useState<Guess[]>([]);
+  const [guessedList, setGuessedList] = useState<Champion[]>([]);
+  const [sets, setSets] = useState<MultiValue<TFTSetSelectValue>>(
+    tftSetOptions.slice(-1)
+  );
+  const [isInfoOn, setIsInfoOn] = useState<boolean>(true);
+
+  const rawOptions = useMemo<Champion[]>(
+    () =>
+      sets.flatMap(({ champions }) => champions).sort((a, b) => b.set - a.set),
+    [sets]
+  );
+
+  const origins: Set<Origins> = useMemo<Set<Origins>>(
+    () =>
+      new Set(
+        rawOptions.flatMap(({ origin1, origin2 }) => {
+          const result = [];
+          if (origin1) {
+            result.push(origin1);
+          }
+          if (origin2) {
+            result.push(origin2);
+          }
+          return result;
+        })
+      ),
+    [rawOptions]
+  );
+
+  const classes: Set<Classes> = useMemo<Set<Classes>>(
+    () =>
+      new Set(
+        rawOptions.flatMap(({ class1, class2 }) => {
+          const result = [];
+          if (class1) {
+            result.push(class1);
+          }
+          if (class2) {
+            result.push(class2);
+          }
+          return result;
+        })
+      ),
+    [rawOptions]
+  );
+
+  const [options, setOptions] = useState<Champion[]>(rawOptions);
+  const [answer, setAnswer] = useState<Champion | undefined>(
+    sample(rawOptions)
+  );
+
+  const reset = useCallback(() => {
+    setGuesses([]);
+    setGuessedList([]);
+    setOptions(rawOptions);
+    setAnswer(sample(rawOptions));
+    setSelected(undefined);
+  }, [rawOptions]);
+
+  useEffect(() => {
+    reset();
+  }, [rawOptions, reset]);
+
+  const guessNumberAnswer = useCallback(
+    (value: number, answer: number) =>
+      value > answer
+        ? GuessNumberAnswer.Under
+        : value < answer
+        ? GuessNumberAnswer.Over
+        : GuessNumberAnswer.Exact,
+    []
+  );
+
+  const guessAnswer = useCallback(
+    (
+      value: Origins | Classes | undefined,
+      answer: Origins | Classes | undefined,
+      answer2: Origins | Classes | undefined
+    ) =>
+      value === answer
+        ? GuessAnswer.Right
+        : value === answer2
+        ? GuessAnswer.Swap
+        : GuessAnswer.Wrong,
+    []
+  );
+
+  const submit = useCallback(() => {
+    if (selected !== undefined && answer) {
+      setSelected(undefined);
+      const selectedChampion = options[selected];
+      const guess: Guess = { name: selectedChampion.name };
+      guess.set = guessNumberAnswer(selectedChampion.set, answer.set);
+      guess.cost = guessNumberAnswer(selectedChampion.cost, answer.cost);
+      guess.origin1 = guessAnswer(
+        selectedChampion.origin1,
+        answer.origin1,
+        answer.origin2
+      );
+      guess.origin2 = guessAnswer(
+        selectedChampion.origin2,
+        answer.origin2,
+        answer.origin1
+      );
+      guess.class1 = guessAnswer(
+        selectedChampion.class1,
+        answer.class1,
+        answer.class2
+      );
+      guess.class2 = guessAnswer(
+        selectedChampion.class2,
+        answer.class2,
+        answer.class1
+      );
+      guess.range = guessNumberAnswer(selectedChampion.range, answer.range);
+      setGuesses((guesses) => [...guesses, guess]);
+      setGuessedList((list) => [...list, selectedChampion]);
+      setOptions((list) => {
+        return list
+          .slice(0, selected)
+          .concat(list.slice(selected + 1, list.length - 1));
+      });
+    }
+  }, [selected, answer, options, guessAnswer, guessNumberAnswer]);
+
+  const renderGuessNumberAnswer = useCallback(
+    (answer: GuessNumberAnswer | undefined) => {
+      switch (answer) {
+        case GuessNumberAnswer.Under:
+          return <i className="fa-solid fa-arrow-down text-red-600"></i>;
+        case GuessNumberAnswer.Over:
+          return <i className="fa-solid fa-arrow-up text-red-600"></i>;
+        case GuessNumberAnswer.Exact:
+          return <i className="fa-solid fa-check text-green-600"></i>;
+        default:
+          return;
+      }
+    },
+    []
+  );
+
+  const renderGuessAnswer = useCallback((answer: GuessAnswer | undefined) => {
+    switch (answer) {
+      case GuessAnswer.Right:
+        return <i className="fa-solid fa-check text-green-600"></i>;
+      case GuessAnswer.Wrong:
+        return <i className="fa-solid fa-xmark text-red-600"></i>;
+      case GuessAnswer.Swap:
+        return <i className="fa-solid fa-arrows-left-right text-blue-600"></i>;
+      default:
+        return;
+    }
+  }, []);
+
+  const isOriginGuessed = useCallback(
+    (value: Origins): IsGuessed => {
+      for (const [i, guessed] of guessedList.entries()) {
+        if ([guessed.origin1, guessed.origin2].includes(value)) {
+          if (
+            guessed.origin1 === value &&
+            (guesses[i].origin1 === GuessAnswer.Right ||
+              guesses[i].origin2 === GuessAnswer.Swap)
+          ) {
+            return IsGuessed.Right;
+          }
+          if (
+            guessed.origin2 === value &&
+            (guesses[i].origin2 === GuessAnswer.Right ||
+              guesses[i].origin1 === GuessAnswer.Swap)
+          ) {
+            return IsGuessed.Right;
+          }
+          return IsGuessed.Wrong;
+        }
+      }
+      return IsGuessed.NotYet;
+    },
+    [guessedList, guesses]
+  );
+
+  const isClassGuessed = useCallback(
+    (value: Classes): IsGuessed => {
+      for (const [i, guessed] of guessedList.entries()) {
+        if ([guessed.class1, guessed.class2].includes(value)) {
+          if (
+            guessed.class1 === value &&
+            (guesses[i].class1 === GuessAnswer.Right ||
+              guesses[i].class2 === GuessAnswer.Swap)
+          ) {
+            return IsGuessed.Right;
+          }
+          if (
+            guessed.class2 === value &&
+            (guesses[i].class2 === GuessAnswer.Right ||
+              guesses[i].class1 === GuessAnswer.Swap)
+          ) {
+            return IsGuessed.Right;
+          }
+          return IsGuessed.Wrong;
+        }
+      }
+      return IsGuessed.NotYet;
+    },
+    [guessedList, guesses]
+  );
+
+  return (
+    <div className="container mx-auto flex flex-col justify-center items-center py-12 gap-5 px-3">
+      <div className="flex flex-col justify-center items-center gap-3">
+        <h1 className="text-3xl">TFTdle</h1>
+        <h2 className="text-2xl">A TFT wordle-like</h2>
+        <h2 className="text-xl">Guess which! You have 7 guesses</h2>
+      </div>
+      <div className="md:hidden w-full grid grid-cols-8 gap-1 text-center text-sm md:text-md">
+        <p>Set</p>
+        <p>Cost</p>
+        <p>O1</p>
+        <p>O2</p>
+        <p>C1</p>
+        <p>C2</p>
+        <p>Range</p>
+      </div>
+      <div className="hidden w-full md:w-2/3 lg:w-1/2 md:grid grid-cols-8 gap-3 text-center text-sm md:text-md">
+        <p>Set</p>
+        <p>Cost</p>
+        <p>Origin 1</p>
+        <p>Origin 2</p>
+        <p>Class 1</p>
+        <p>Class 2</p>
+        <p>Range</p>
+      </div>
+      {guesses.map((guess, i) => (
+        <div
+          key={i}
+          className="w-full md:w-2/3 lg:w-1/2 grid grid-cols-8 gap-1 md:gap-3 text-center text-sm md:text-base"
+        >
+          <p>{renderGuessNumberAnswer(guess.set)}</p>
+          <p>{renderGuessNumberAnswer(guess.cost)}</p>
+          <p>{renderGuessAnswer(guess.origin1)}</p>
+          <p>{renderGuessAnswer(guess.origin2)}</p>
+          <p>{renderGuessAnswer(guess.class1)}</p>
+          <p>{renderGuessAnswer(guess.class2)}</p>
+          <p>{renderGuessNumberAnswer(guess.range)}</p>
+          <p>{guess.name}</p>
+        </div>
+      ))}
+      <div className="w-full md:w-1/2 flex flex-col md:grid md:grid-cols-4 gap-3 items-center">
+        <Select
+          className="md:col-span-3 w-full"
+          options={options.map((c, i) => ({
+            value: i,
+            label: `${c.name} Set ${c.set}`,
+            raw: c,
+          }))}
+          styles={{
+            menu: (base) => ({
+              ...base,
+              color: "black",
+            }),
+          }}
+          components={{
+            Option: (props) => (
+              <CustomOption {...props} isInfoOn={isInfoOn}></CustomOption>
+            ),
+          }}
+          onChange={(selected) => selected && setSelected(selected.value)}
+        />
+        <button
+          className="bg-white rounded text-neutral-900 px-5 py-1.5 disabled:opacity-60"
+          disabled={
+            guesses.length >= 7 ||
+            guessedList[guessedList.length - 1] === answer
+          }
+          onClick={submit}
+        >
+          Submit
+        </button>
+      </div>
+      <button
+        type="button"
+        className="bg-gray-500 rounded text-white px-5 py-1.5"
+        onClick={() => setIsInfoOn((isInfoOn) => !isInfoOn)}
+      >
+        Champion Info {isInfoOn ? "ON" : "OFF"}
+      </button>
+      {answer && answer === guessedList[guessedList.length - 1] && (
+        <div className="text-center">
+          <h1>You won!</h1>
+          <h2>
+            The secret TFT champion was {answer.name} from Set {answer.set}
+          </h2>
+        </div>
+      )}
+      {guesses.length >= 7 && answer && answer !== guessedList[6] && (
+        <div className="text-center">
+          <h1>You lost!</h1>
+          <h2>
+            The secret TFT champion was {answer.name} from Set {answer.set}
+          </h2>
+        </div>
+      )}
+      <div className="w-full md:w-2/3 lg:w-1/3 text-center flex flex-col gap-1">
+        <p>Origins</p>
+        <div className="flex flex-wrap gap-1 text-sm items-center justify-center">
+          {Array.from(origins)
+            .sort()
+            .map((value) => {
+              const isGuessed = isOriginGuessed(value);
+              return (
+                <div
+                  key={value}
+                  className={`rounded p-1 ${
+                    isGuessed === IsGuessed.Right
+                      ? "bg-green-600"
+                      : isGuessed === IsGuessed.Wrong
+                      ? "bg-gray-600"
+                      : "bg-blue-600"
+                  }`}
+                >
+                  {value}
+                </div>
+              );
+            })}
+        </div>
+      </div>
+      <div className="w-full md:w-2/3 lg:w-1/3 text-center flex flex-col gap-1">
+        <p>Classes</p>
+        <div className="flex flex-wrap gap-1 text-sm items-center justify-center">
+          {Array.from(classes)
+            .sort()
+            .map((value) => {
+              const isGuessed = isClassGuessed(value);
+              return (
+                <div
+                  key={value}
+                  className={`rounded p-1 ${
+                    isGuessed === IsGuessed.Right
+                      ? "bg-green-600"
+                      : isGuessed === IsGuessed.Wrong
+                      ? "bg-gray-600"
+                      : "bg-blue-600"
+                  }`}
+                >
+                  {value}
+                </div>
+              );
+            })}
+        </div>
+      </div>
+      <div className="w-full md:w-2/3 lg:w-1/3 text-center flex flex-col gap-1">
+        <h1>TFT champions from</h1>
+        <Select
+          options={tftSetOptions}
+          styles={{
+            menu: (base) => ({
+              ...base,
+              color: "black",
+            }),
+          }}
+          isMulti
+          value={sets}
+          onChange={setSets}
+        />
+      </div>
+      <button
+        className="bg-white rounded text-neutral-900 px-5 py-1.5"
+        onClick={reset}
+      >
+        Reset
+      </button>
+    </div>
+  );
+};
 
 export default App;
